@@ -1,0 +1,2 @@
+#[derive(Component)]
+struct Snake;

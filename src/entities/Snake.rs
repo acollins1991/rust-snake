@@ -1,2 +1,0 @@
-#[derive(Component)]
-struct Snake;

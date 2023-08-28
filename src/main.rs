@@ -1,4 +1,13 @@
-use bevy::{audio::CpalSample, prelude::*, transform::commands};
+use bevy::prelude::*;
+
+// register mods
+mod constants;
+mod snake;
+mod utils;
+mod map;
+
+use snake::*;
+use utils::calculate_map_position;
 
 /*
 A SnakePiece must have;
@@ -17,11 +26,6 @@ static MAP_TILE_SIZE: f32 = 25.0;
 static MAP_HEIGHT: f32 = MAP_TILE_SIZE * 17.;
 static MAP_WIDTH: f32 = MAP_TILE_SIZE * 17.;
 static MAP_CENTER_VALUE: f32 = MAP_HEIGHT / 2.;
-
-#[derive(Component)]
-struct Snake {
-    segments: Vec<(u8, u8)>,
-}
 
 #[derive(Debug)]
 enum Direction {
@@ -42,14 +46,6 @@ struct Map;
 
 #[derive(Component, Debug)]
 struct MapTile((i32, i32));
-
-fn init_snake(mut commands: Commands) {
-    commands.spawn(Snake {
-        segments: vec![(7, 9), (8, 9), (9, 9), (10, 9)],
-    });
-    commands.spawn(CurrentDirection(Direction::Right));
-    commands.spawn(GameOver(false));
-}
 
 fn init_map(mut commands: Commands) {
     // create map and map tiles
@@ -82,19 +78,6 @@ fn init_map(mut commands: Commands) {
     }
 }
 
-#[derive(Component)]
-struct Position {
-    x: f32,
-    y: f32,
-}
-
-fn calculate_map_position(x: i32, y: i32, map_center_value: f32, map_tile_size: f32) -> Position {
-    let x_pos = map_tile_size * x as f32 - map_center_value;
-    let y_pos = map_tile_size * y as f32 - map_center_value;
-
-    Position { x: x_pos, y: y_pos }
-}
-
 fn init_camera(mut commands: Commands) {
     // setup camera
     commands.spawn(Camera2dBundle::default());
@@ -105,8 +88,7 @@ fn init_map_renderer(map_tiles_query: Query<&MapTile>, mut commands: Commands) {
 
     // render tiles
     for tile in map_tiles {
-        let position =
-            calculate_map_position(tile.0 .0, tile.0 .1, MAP_CENTER_VALUE, MAP_TILE_SIZE);
+        let position = calculate_map_position(tile.0 .0, tile.0 .1);
         // calc positions
         let x_pos = position.x;
         let y_pos = position.y;
@@ -127,42 +109,13 @@ fn init_map_renderer(map_tiles_query: Query<&MapTile>, mut commands: Commands) {
 #[derive(Component)]
 struct SnakeSegmentSprite(u8, u8);
 
-fn init_snake_renderer(snake_query: Query<&Snake>, mut commands: Commands) {
-    let snake = snake_query.single();
-
-    for segment in snake.segments.iter() {
-        let position = calculate_map_position(
-            segment.0 as i32,
-            segment.1 as i32,
-            MAP_CENTER_VALUE,
-            MAP_TILE_SIZE,
-        );
-        // calc positions
-        let x_pos = position.x;
-        let y_pos = position.y;
-
-        commands
-            .spawn(SnakeSegmentSprite(segment.0, segment.1))
-            .insert(SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgb(0.8, 0.8, 0.8),
-                    custom_size: Some(Vec2::new(MAP_TILE_SIZE, MAP_TILE_SIZE)),
-                    ..default()
-                },
-                transform: Transform::from_translation(Vec3::new(x_pos, y_pos, 2.)),
-                ..default()
-            })
-            .insert(position);
-    }
-}
-
 #[derive(Resource)]
 struct MovementTimer(Timer);
 
 fn move_snake_segments(
     time: Res<Time>,
     mut timer: ResMut<MovementTimer>,
-    mut query: Query<&mut Snake>,
+    mut query: Query<(&mut Snake, &Children)>,
     direction_query: Query<&CurrentDirection>,
     mut game_over_query: Query<&GameOver>,
 ) {
@@ -172,7 +125,7 @@ fn move_snake_segments(
     }
 
     let mut snake = query.single_mut();
-    let snake_segments = snake.segments.clone();
+    let snake_segments = snake
     let mut updated_segments = snake_segments.clone();
     let game_over = game_over_query.single_mut();
 
